@@ -9,6 +9,8 @@ itertools = "0.13.0"
 prost = "0.13.1"
 tokio = { version = "1.39.2", features = ["full"] }
 tonic = "0.12.1"
+fr-pmx-config-lib = { path = "../fr-pmx-config-lib" }
+fr-logging = { path = "../fr-logging" }
 
 [build-dependencies]
 tonic-build = "0.12.1"

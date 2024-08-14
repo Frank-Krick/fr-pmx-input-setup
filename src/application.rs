@@ -2,10 +2,9 @@ use fr_pipewire_registry::ports::port_client::PortClient;
 use fr_pipewire_registry::ports::{ListPort, ListPortsRequest, PortDirection};
 use iced::application::Application;
 
-use iced::futures::SinkExt;
 use iced::widget::{column, combo_box, row, text, Column, Row};
 use iced::{Command, Element};
-use pmx::input::{self, PmxInput, PmxInputType};
+use pmx::input::{PmxInput, PmxInputType};
 use pmx::pmx_registry_client::PmxRegistryClient;
 use pmx::EmptyRequest;
 use tonic::Request;
