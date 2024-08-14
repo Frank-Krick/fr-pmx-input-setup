@@ -64,10 +64,16 @@ pub struct App {
     pipewire_in_port_paths: iced::widget::combo_box::State<String>,
 }
 
+#[derive(Default, Clone)]
+pub struct AppFlags {
+    pub port_registry_url: String,
+    pub pmx_registry_url: String,
+}
+
 type Executor = iced::executor::Default;
 type Message = AppMessage;
 type Theme = iced::Theme;
-type Flags = ();
+type Flags = AppFlags;
 
 impl Application for App {
     type Executor = Executor;
