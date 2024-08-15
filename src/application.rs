@@ -81,7 +81,7 @@ impl Application for App {
     type Theme = Theme;
     type Flags = Flags;
 
-    fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+    fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
         (
             App {
                 inputs: Vec::new(),
@@ -95,13 +95,13 @@ impl Application for App {
             },
             iced::Command::perform(
                 async move {
-                    let mut client = PmxRegistryClient::connect("http://127.0.0.1:50001")
+                    let mut client = PmxRegistryClient::connect(flags.pmx_registry_url)
                         .await
                         .unwrap();
                     let request = Request::new(EmptyRequest {});
                     let inputs_response = client.list_inputs(request).await.unwrap();
 
-                    let mut client = PortClient::connect("http://127.0.0.1:50000").await.unwrap();
+                    let mut client = PortClient::connect(flags.port_registry_url).await.unwrap();
                     let request = Request::new(ListPortsRequest {});
                     let ports_respose = client.list_ports(request).await.unwrap();
                     (
