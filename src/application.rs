@@ -23,6 +23,8 @@ pub mod fr_pipewire_registry {
     }
 }
 
+mod port_control;
+
 #[derive(Clone, Debug)]
 pub enum AppMessage {
     LoadInputsCompleted((Vec<PmxInput>, Vec<ListPort>)),
@@ -201,68 +203,8 @@ impl Application for App {
         let elements = input_rows
             .into_iter()
             .map(|i| {
-                iced::widget::Container::new(row![column![
-                    Row::<Self::Message, Self::Theme, iced::Renderer>::from_vec(vec![
-                        text(i.name.clone()).height(35).width(125).into(),
-                        combo_box(
-                            &self.port_types,
-                            "Select input type",
-                            i.selected_port_type.as_ref(),
-                            move |selected_port_type| {
-                                Self::Message::PortTypeSelected(i.pmx_input_id, selected_port_type)
-                            },
-                        )
-                        .width(250)
-                        .padding(5)
-                        .into(),
-                    ])
-                    .padding(5),
-                    row![
-                        text(String::from("Left Port"))
-                            .width(125)
-                            .height(35)
-                            .vertical_alignment(iced::alignment::Vertical::Center),
-                        combo_box(
-                            &self.pipewire_out_port_paths,
-                            "Select port path",
-                            i.selected_left_out_port_path.as_ref(),
-                            move |path| {
-                                Self::Message::LeftPortSelected(i.pmx_input_id, path.clone())
-                            }
-                        )
-                        .width(500)
-                        .padding(5)
-                    ]
-                    .padding(5),
-                    row![
-                        text(String::from("Right Port"))
-                            .width(125)
-                            .height(35)
-                            .vertical_alignment(iced::alignment::Vertical::Center),
-                        combo_box(
-                            &self.pipewire_out_port_paths,
-                            "Select port path",
-                            i.selected_right_out_port_path.as_ref(),
-                            move |path| {
-                                Self::Message::RightPortSelected(i.pmx_input_id, path.clone())
-                            }
-                        )
-                        .width(500)
-                        .padding(5)
-                    ]
-                    .padding(5)
-                ]])
-                .style(iced::widget::container::Appearance {
-                    text_color: Some(self.theme().extended_palette().background.strong.text),
-                    background: Some(self.theme().extended_palette().background.base.color.into()),
-                    border: iced::Border {
-                        color: self.theme().extended_palette().background.strong.color,
-                        width: 1.0,
-                        radius: 1.into(),
-                    },
-                    shadow: iced::Shadow::default(),
-                })
-                .into()
+                port_control::port_control(&i, &self.port_types, &self.pipewire_out_port_paths)
+                    .into()
             })
             .collect::<Vec<Element<Self::Message, Self::Theme, iced::Renderer>>>();
         Column::from_vec(elements).padding(5).spacing(10).into()
