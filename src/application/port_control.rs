@@ -1,6 +1,6 @@
-use iced::widget::{combo_box, combo_box::State, row, text, Column, Container, Row};
-
 use super::{AppListLine, Message, PortType, Theme};
+use iced::color;
+use iced::widget::{combo_box, combo_box::State, row, svg, text, Column, Container, Row};
 
 pub fn port_path_combo_box<'a>(
     label_text: String,
@@ -33,6 +33,18 @@ pub fn port_type_combo_box<'a>(
     input_id: u32,
     message: fn(u32, PortType) -> Message,
 ) -> iced::widget::Row<'a, Message, Theme, iced::Renderer> {
+    let handle = svg::Handle::from_path(format!(
+        "{}/resources/check2-square.svg",
+        env!("CARGO_MANIFEST_DIR")
+    ));
+
+    let svg = svg(handle)
+        .width(35)
+        .height(35)
+        .style(iced::theme::Svg::custom_fn(|_theme| svg::Appearance {
+            color: Some(color!(0xffffff)),
+        }));
+
     Row::<Message, Theme, iced::Renderer>::from_vec(vec![
         text(port_name.clone()).height(35).width(125).into(),
         combo_box(
@@ -44,6 +56,7 @@ pub fn port_type_combo_box<'a>(
         .width(250)
         .padding(5)
         .into(),
+        svg.into(),
     ])
     .padding(5)
 }
