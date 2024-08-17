@@ -1,7 +1,7 @@
 use fr_pipewire_registry::ports::port_client::PortClient;
 use fr_pipewire_registry::ports::{ListPort, ListPortsRequest, PortDirection};
 use iced::application::Application;
-use iced::widget::svg;
+use iced::widget::{svg, Scrollable};
 
 use iced::widget::Column;
 use iced::{Command, Element};
@@ -34,6 +34,7 @@ pub enum AppMessage {
     PortTypeSelected(u32, PortType),
     LeftPortSelected(u32, String),
     RightPortSelected(u32, String),
+    PortDataSaved(u32),
 }
 
 #[derive(Clone, Debug)]
@@ -85,6 +86,7 @@ pub struct App {
     pipewire_out_port_paths: iced::widget::combo_box::State<String>,
     pipewire_in_port_paths: iced::widget::combo_box::State<String>,
     svg_indicators: InputConfigStateIndicatorSvgs,
+    pmx_registry_url: String,
 }
 
 #[derive(Default, Clone)]
@@ -105,6 +107,89 @@ impl App {
             env!("CARGO_MANIFEST_DIR"),
             resource_name
         ))
+    }
+
+    async fn save_none_port(id: u32, registry_url: String) {
+        let mut client = PmxRegistryClient::connect(registry_url).await.unwrap();
+        let request = Request::new(pmx::UpdateInputPortAssignmentsRequest {
+            id,
+            input_type: PmxInputType::None as i32,
+            left_port_path: None,
+            right_port_path: None,
+        });
+        client.update_input_port_assignments(request).await.unwrap();
+    }
+
+    async fn save_mono_port(id: u32, left: &str, registry_url: String) {
+        let mut client = PmxRegistryClient::connect(registry_url).await.unwrap();
+        let request = Request::new(pmx::UpdateInputPortAssignmentsRequest {
+            id,
+            input_type: PmxInputType::MonoInput as i32,
+            left_port_path: Some(String::from(left)),
+            right_port_path: None,
+        });
+        client.update_input_port_assignments(request).await.unwrap();
+    }
+
+    async fn save_stereo_input_ports(id: u32, left: &str, right: &str, registry_url: String) {
+        let mut client = PmxRegistryClient::connect(registry_url).await.unwrap();
+        let request = Request::new(pmx::UpdateInputPortAssignmentsRequest {
+            id,
+            input_type: PmxInputType::StereoInput as i32,
+            left_port_path: Some(String::from(left)),
+            right_port_path: Some(String::from(right)),
+        });
+        client.update_input_port_assignments(request).await.unwrap();
+    }
+
+    fn update_port_assignments_if_valid(&self, input_index: usize) -> Command<AppMessage> {
+        if self.inputs[input_index].is_valid() {
+            let input = self.inputs[input_index].clone();
+            let url = self.pmx_registry_url.clone();
+            match input.selected_port_type {
+                Some(port_type) => match port_type {
+                    PortType::Mono => {
+                        let input_id = input.pmx_input_id;
+                        let path = input.selected_left_out_port_path.unwrap().clone();
+                        Command::perform(
+                            async move {
+                                App::save_mono_port(input_id, path.as_ref(), url).await;
+                            },
+                            move |_| Message::PortDataSaved(input_index as u32),
+                        )
+                    }
+                    PortType::Stereo => {
+                        let input_id = input.pmx_input_id;
+                        let left_path = input.selected_left_out_port_path.unwrap().clone();
+                        let right_path = input.selected_right_out_port_path.unwrap().clone();
+                        Command::perform(
+                            async move {
+                                App::save_stereo_input_ports(
+                                    input_id,
+                                    left_path.as_ref(),
+                                    right_path.as_ref(),
+                                    url,
+                                )
+                                .await;
+                            },
+                            move |_| Message::PortDataSaved(input_index as u32),
+                        )
+                    }
+                    PortType::None => {
+                        let input_id = input.pmx_input_id;
+                        Command::perform(
+                            async move {
+                                App::save_none_port(input_id, url).await;
+                            },
+                            move |_| Message::PortDataSaved(input_index as u32),
+                        )
+                    }
+                },
+                None => Command::none(),
+            }
+        } else {
+            Command::none()
+        }
     }
 }
 
@@ -130,6 +215,7 @@ impl Application for App {
                     valid: App::read_svg("check2-square.svg"),
                     valid_and_saved: App::read_svg("save2.svg"),
                 },
+                pmx_registry_url: flags.pmx_registry_url.clone(),
             },
             iced::Command::perform(
                 async move {
@@ -207,7 +293,8 @@ impl Application for App {
                     .unwrap()
                     .0;
                 self.inputs[changed_input_index].selected_port_type = Some(port_type);
-                Command::none()
+                self.inputs[changed_input_index].saved = false;
+                self.update_port_assignments_if_valid(changed_input_index)
             }
             AppMessage::LeftPortSelected(id, path) => {
                 let changed_input_index = self
@@ -218,7 +305,8 @@ impl Application for App {
                     .unwrap()
                     .0;
                 self.inputs[changed_input_index].selected_left_out_port_path = Some(path.clone());
-                Command::none()
+                self.inputs[changed_input_index].saved = false;
+                self.update_port_assignments_if_valid(changed_input_index)
             }
             AppMessage::RightPortSelected(id, path) => {
                 let changed_input_index = self
@@ -229,6 +317,18 @@ impl Application for App {
                     .unwrap()
                     .0;
                 self.inputs[changed_input_index].selected_right_out_port_path = Some(path.clone());
+                self.inputs[changed_input_index].saved = false;
+                self.update_port_assignments_if_valid(changed_input_index)
+            }
+            AppMessage::PortDataSaved(id) => {
+                let changed_input_index = self
+                    .inputs
+                    .iter()
+                    .enumerate()
+                    .find(|(_index, input)| input.pmx_input_id == id)
+                    .unwrap()
+                    .0;
+                self.inputs[changed_input_index].saved = true;
                 Command::none()
             }
         }
@@ -249,6 +349,6 @@ impl Application for App {
                 .into()
             })
             .collect::<Vec<Element<Self::Message, Self::Theme, iced::Renderer>>>();
-        Column::from_vec(elements).padding(5).spacing(10).into()
+        Scrollable::new(Column::from_vec(elements).padding(5).spacing(10)).into()
     }
 }
