@@ -1,13 +1,16 @@
 use fr_pipewire_registry::ports::port_client::PortClient;
 use fr_pipewire_registry::ports::{ListPort, ListPortsRequest, PortDirection};
 use iced::application::Application;
+use iced::widget::svg;
 
-use iced::widget::{column, combo_box, row, text, Column, Row};
+use iced::widget::Column;
 use iced::{Command, Element};
 use pmx::input::{PmxInput, PmxInputType};
 use pmx::pmx_registry_client::PmxRegistryClient;
 use pmx::EmptyRequest;
 use tonic::Request;
+
+use crate::application::port_control::InputConfigStateIndicatorSvgs;
 
 pub mod pmx {
     tonic::include_proto!("pmx");
@@ -57,6 +60,23 @@ struct AppListLine {
     selected_port_type: Option<PortType>,
     selected_left_out_port_path: Option<String>,
     selected_right_out_port_path: Option<String>,
+    saved: bool,
+}
+
+impl AppListLine {
+    fn is_valid(&self) -> bool {
+        match self.selected_port_type.clone() {
+            Some(port_type) => match port_type {
+                PortType::Mono => self.selected_left_out_port_path.is_some(),
+                PortType::Stereo => {
+                    self.selected_left_out_port_path.is_some()
+                        && self.selected_right_out_port_path.is_some()
+                }
+                PortType::None => true,
+            },
+            None => false,
+        }
+    }
 }
 
 pub struct App {
@@ -64,6 +84,7 @@ pub struct App {
     port_types: iced::widget::combo_box::State<PortType>,
     pipewire_out_port_paths: iced::widget::combo_box::State<String>,
     pipewire_in_port_paths: iced::widget::combo_box::State<String>,
+    svg_indicators: InputConfigStateIndicatorSvgs,
 }
 
 #[derive(Default, Clone)]
@@ -76,6 +97,16 @@ type Executor = iced::executor::Default;
 type Message = AppMessage;
 type Theme = iced::Theme;
 type Flags = AppFlags;
+
+impl App {
+    fn read_svg(resource_name: &str) -> svg::Handle {
+        svg::Handle::from_path(format!(
+            "{}/resources/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            resource_name
+        ))
+    }
+}
 
 impl Application for App {
     type Executor = Executor;
@@ -94,6 +125,11 @@ impl Application for App {
                 ]),
                 pipewire_out_port_paths: iced::widget::combo_box::State::new(Vec::new()),
                 pipewire_in_port_paths: iced::widget::combo_box::State::new(Vec::new()),
+                svg_indicators: InputConfigStateIndicatorSvgs {
+                    invalid: App::read_svg("x-square.svg"),
+                    valid: App::read_svg("check2-square.svg"),
+                    valid_and_saved: App::read_svg("save2.svg"),
+                },
             },
             iced::Command::perform(
                 async move {
@@ -140,6 +176,7 @@ impl Application for App {
                         },
                         selected_left_out_port_path: i.left_port_path.clone(),
                         selected_right_out_port_path: i.right_port_path.clone(),
+                        saved: true,
                     })
                     .collect();
                 let in_port_paths = inputs
@@ -203,8 +240,13 @@ impl Application for App {
         let elements = input_rows
             .into_iter()
             .map(|i| {
-                port_control::port_control(&i, &self.port_types, &self.pipewire_out_port_paths)
-                    .into()
+                port_control::port_control(
+                    &i,
+                    &self.port_types,
+                    &self.pipewire_out_port_paths,
+                    &self.svg_indicators,
+                )
+                .into()
             })
             .collect::<Vec<Element<Self::Message, Self::Theme, iced::Renderer>>>();
         Column::from_vec(elements).padding(5).spacing(10).into()

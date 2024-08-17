@@ -2,6 +2,12 @@ use super::{AppListLine, Message, PortType, Theme};
 use iced::color;
 use iced::widget::{combo_box, combo_box::State, row, svg, text, Column, Container, Row};
 
+pub struct InputConfigStateIndicatorSvgs {
+    pub invalid: svg::Handle,
+    pub valid: svg::Handle,
+    pub valid_and_saved: svg::Handle,
+}
+
 pub fn port_path_combo_box<'a>(
     label_text: String,
     states: &'a State<String>,
@@ -18,7 +24,7 @@ pub fn port_path_combo_box<'a>(
             states,
             "Select port path",
             selected_path.as_ref(),
-            move |path| { message(input_id, path.clone()) } //move |path| { Message::RightPortSelected(input_id, path.clone()) }
+            move |path| { message(input_id, path.clone()) }
         )
         .width(500)
         .padding(5)
@@ -32,19 +38,8 @@ pub fn port_type_combo_box<'a>(
     selected_port_type: &Option<PortType>,
     input_id: u32,
     message: fn(u32, PortType) -> Message,
+    indicator_svg: &svg::Handle,
 ) -> iced::widget::Row<'a, Message, Theme, iced::Renderer> {
-    let handle = svg::Handle::from_path(format!(
-        "{}/resources/check2-square.svg",
-        env!("CARGO_MANIFEST_DIR")
-    ));
-
-    let svg = svg(handle)
-        .width(35)
-        .height(35)
-        .style(iced::theme::Svg::custom_fn(|_theme| svg::Appearance {
-            color: Some(color!(0xffffff)),
-        }));
-
     Row::<Message, Theme, iced::Renderer>::from_vec(vec![
         text(port_name.clone()).height(35).width(125).into(),
         combo_box(
@@ -56,7 +51,13 @@ pub fn port_type_combo_box<'a>(
         .width(250)
         .padding(5)
         .into(),
-        svg.into(),
+        svg(indicator_svg.clone())
+            .width(35)
+            .height(35)
+            .style(iced::theme::Svg::custom_fn(|_theme| svg::Appearance {
+                color: Some(color!(0xffffff)),
+            }))
+            .into(),
     ])
     .padding(5)
 }
@@ -65,6 +66,7 @@ pub fn port_control<'a>(
     line: &AppListLine,
     port_types: &'a State<PortType>,
     port_paths: &'a State<String>,
+    svg_indicators: &InputConfigStateIndicatorSvgs,
 ) -> Container<'a, Message, Theme, iced::Renderer> {
     let mut column = Column::new().push(port_type_combo_box(
         line.name.clone(),
@@ -72,6 +74,11 @@ pub fn port_control<'a>(
         &line.selected_port_type,
         line.pmx_input_id,
         Message::PortTypeSelected,
+        match (line.is_valid(), line.saved) {
+            (true, true) => &svg_indicators.valid_and_saved,
+            (true, false) => &svg_indicators.valid,
+            (false, _) => &svg_indicators.invalid,
+        },
     ));
 
     match &line.selected_port_type {
