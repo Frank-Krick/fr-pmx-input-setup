@@ -1,5 +1,6 @@
-use fr_pipewire_registry::ports::port_client::PortClient;
-use fr_pipewire_registry::ports::{ListPort, ListPortsRequest, PortDirection};
+use fr_pipewire_registry::pipewire_client::PipewireClient;
+use fr_pipewire_registry::port::{ListPort, PortDirection};
+use fr_pipewire_registry::ListPortsRequest;
 use iced::application::Application;
 use iced::widget::{svg, Scrollable};
 
@@ -18,11 +19,42 @@ pub mod pmx {
     pub mod input {
         tonic::include_proto!("pmx.input");
     }
+
+    pub mod plugin {
+        tonic::include_proto!("pmx.plugin");
+    }
+
+    pub mod channel_strip {
+        tonic::include_proto!("pmx.channel_strip");
+    }
+
+    pub mod looper {
+        tonic::include_proto!("pmx.looper");
+    }
 }
 
 pub mod fr_pipewire_registry {
-    pub mod ports {
-        tonic::include_proto!("fr_pipewire_registry.ports");
+
+    tonic::include_proto!("pmx.pipewire");
+
+    pub mod node {
+        tonic::include_proto!("pmx.pipewire.node");
+    }
+
+    pub mod port {
+        tonic::include_proto!("pmx.pipewire.port");
+    }
+
+    pub mod application {
+        tonic::include_proto!("pmx.pipewire.application");
+    }
+
+    pub mod device {
+        tonic::include_proto!("pmx.pipewire.device");
+    }
+
+    pub mod link {
+        tonic::include_proto!("pmx.pipewire.link");
     }
 }
 
@@ -225,8 +257,12 @@ impl Application for App {
                     let request = Request::new(EmptyRequest {});
                     let inputs_response = client.list_inputs(request).await.unwrap();
 
-                    let mut client = PortClient::connect(flags.port_registry_url).await.unwrap();
-                    let request = Request::new(ListPortsRequest {});
+                    let mut client = PipewireClient::connect(flags.port_registry_url)
+                        .await
+                        .unwrap();
+                    let request = Request::new(ListPortsRequest {
+                        node_id_filter: None,
+                    });
                     let ports_respose = client.list_ports(request).await.unwrap();
                     (
                         inputs_response.get_ref().inputs.clone(),
